@@ -1,5 +1,3 @@
-package info.video;
-
 import java.awt.Dimension;
 import java.io.BufferedReader;
 import java.io.File;
@@ -16,7 +14,8 @@ import com.github.sarxos.webcam.WebcamResolution;
 
 public class VideoCapture implements Runnable {
 	boolean stopped = false;
-
+	boolean webcamFlag = false;
+	
 	public static void main(String args[]) throws IOException{
 		//doJob();
 	}
@@ -55,8 +54,9 @@ public class VideoCapture implements Runnable {
 		int ms;
 		long startTime, endTime, diffTime;
 		Webcam webcam = Webcam.getDefault();
-		webcam.setViewSize(WebcamResolution.VGA.getSize());
+		//webcam.setViewSize(WebcamResolution.VGA.getSize());
 		webcam.open();
+		webcamFlag = true;
 		Calendar cal = Calendar.getInstance(TimeZone.getDefault());
 		cal.setTime(new Date());
 
@@ -72,10 +72,16 @@ public class VideoCapture implements Runnable {
         			diffTime = (endTime - startTime);
 				String s = String.valueOf(diffTime);
 				ImageIO.write(webcam.getImage(), "png", new File("images/cap"+s+".png"));
+				try {
+					Thread.sleep(50);
+				} catch (Exception e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
-			}	
+			}
 		}
 		//webcam.close();
 	}
@@ -84,6 +90,9 @@ public class VideoCapture implements Runnable {
 		stopped = true;
 	}
 	
+	public boolean isOpen() {
+		return webcamFlag;
+	}
 	 /*
      * ファイルおよびディレクトリを削除する
      */
