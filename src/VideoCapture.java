@@ -71,7 +71,7 @@ public class VideoCapture implements Runnable {
                 endTime = System.currentTimeMillis();
         			diffTime = (endTime - startTime);
 				String s = String.valueOf(diffTime);
-				ImageIO.write(webcam.getImage(), "png", new File("images/cap"+s+".png"));
+				ImageIO.write(webcam.getImage(), "png", new File("images/"+s+".png"));
 				try {
 					Thread.sleep(50);
 				} catch (Exception e) {
@@ -92,6 +92,28 @@ public class VideoCapture implements Runnable {
 	
 	public boolean isOpen() {
 		return webcamFlag;
+	}
+	
+	public String getNearFile(int milli) {
+		File dir = new File("images");
+		File[] files = dir.listFiles();
+		int diff=Integer.MAX_VALUE;
+		String ans="";
+		//if file doesn't exist or empty
+		if (files == null || files.length == 0) {
+			return "error occured";
+		}
+		
+		for(int i=0; i<files.length; i++) {
+			String fileName = files[i].getName();
+			String fileMilliStr = fileName.substring(0, fileName.length()-4);
+			int fileMilli = Integer.parseInt(fileMilliStr);
+			if(diff > Math.abs(fileMilli - milli)) {
+				diff = Math.abs(fileMilli - milli);
+				ans = files[i].getName();
+			}
+		}
+		return ans;
 	}
 	 /*
      * ファイルおよびディレクトリを削除する
