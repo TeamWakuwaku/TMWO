@@ -4,10 +4,16 @@ import java.nio.*;
 import java.util.Arrays;
 import java.util.*;
 import javax.sound.midi.*;
+import javax.swing.*;
+import javax.imageio.*;
+import java.awt.Graphics;
+import java.awt.image.BufferedImage;
 
 public class WakuwakuSampler implements Runnable {
 	AudioFileFormat.Type fileType = AudioFileFormat.Type.WAVE;
 	File wavFile;
+	
+	String rhythmMidiName = "mhd2018_arab_midi.mid";
 	
 	static final float SAMPLE_RATE = 22050;
 	static final int SAMPLE_SIZE_IN_BITS = 16;
@@ -27,7 +33,10 @@ public class WakuwakuSampler implements Runnable {
 	double maxAmp = 0;
 	double normalizeRatio;
 	
+	Track rhythmTrack;
+	
 	VideoCapture cap;
+	
 	
 	int bdI = -1;
 	int sdI = -1;
@@ -43,18 +52,43 @@ public class WakuwakuSampler implements Runnable {
 	}
 	
 	public WakuwakuSampler() throws Exception {
+		rhythmTrack = readMidi(rhythmMidiName);
+		/*
+		Sequence sequence = new Sequence(Sequence.PPQ, 480);
+		Track track = sequence.createTrack();
+		for (int i = 0; i < rhythmTrack.size(); i++) {
+			MidiEvent event = rhythmTrack.get(i);
+			track.add(event);
+		}
+		Synthesizer synthesizer = MidiSystem.getSynthesizer();
+		Instrument[] insts = synthesizer.getAvailableInstruments();
+		for (Instrument inst: insts) {
+			if (inst.toString().startsWith("Drumkit")) {
+				System.out.println(inst);
+				System.out.println(" "+inst.);
+			}
+		}
+		*/
+		//synthesizer.remapInstrument(, );
+	    //synthesizer.open();
+	    
+		
 		format = new AudioFormat(SAMPLE_RATE, SAMPLE_SIZE_IN_BITS, CHANNELS, SIGNED, BIG_ENDIAN);
         line = AudioSystem.getTargetDataLine(format);
         line.open(format);
         cap = new VideoCapture();
+
         
         BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
         
         System.err.println("Press Enter to START Recording...");
-        //Thread capThread = new Thread(cap);
-        //capThread.start();
-        //System.err.println("Waiting the Open of Web Camera...");
-        //while (! cap.isOpen()) {}
+        Thread capThread = new Thread(cap);
+        /*
+
+        capThread.start();
+        System.err.println("Waiting the Open of Web Camera...");
+        while (! cap.isOpen()) {}
+        */
         in.readLine();
         System.err.println("Record Started!");
         Thread thread = new Thread(this);
@@ -65,7 +99,7 @@ public class WakuwakuSampler implements Runnable {
         System.err.println("Press Enter to STOP Recording...");
         in.readLine();
         stopRecording();
-        //cap.pause();
+        cap.pause();
         
         initialize();
         dft(WindowSize);
@@ -77,6 +111,13 @@ public class WakuwakuSampler implements Runnable {
         extractSnareDrum();
         extractHighHat();
         extractVoice();
+        
+        WakuwakuFrame frame = new WakuwakuFrame("");
+        frame.setImgFile(cap.getNearFile(iToMilli(bdI)));
+        
+        
+		Sequencer sequencer = MidiSystem.getSequencer(false);
+		sequencer.open();
         
 	}
 	
@@ -111,6 +152,12 @@ public class WakuwakuSampler implements Runnable {
 		if (i <= sdI && sdI <= j) { return true; }
 		if (i <= hhI && hhI <= j) { return true; }
 		return false;
+	}
+	
+	int iToMilli(int i) {
+		int frame = i * WindowSize;
+		double t = frame / format.getFrameRate();
+		return (int)Math.floor(t * 1000);
 	}
 	
 	int startFrame(int i) {
@@ -261,8 +308,10 @@ public class WakuwakuSampler implements Runnable {
 		return i / format.getSampleRate();
 	}
 	
-	void readMidi(String midiFileName) throws Exception {
+	Track readMidi(String midiFileName) throws Exception {
 	    Track[] tracks = MidiSystem.getSequence(new File(midiFileName)).getTracks();
+	    //System.out.println("track count: "+ tracks.length);
+	    return tracks[0];
 	}
 	
     void dft( double[] in , double[] outActual , double[] outImaginal , boolean winFlg )
@@ -378,5 +427,40 @@ public class WakuwakuSampler implements Runnable {
     	
     }
     
+}
+
+
+class WakuwakuFrame extends JFrame {
+	
+	File pngFile;
+	
+	WakuwakuFrame(String title){
+	    setTitle(title);
+	    setBounds(100, 100, 700, 700);
+	    setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+	    setVisible(true);
+	    
+	    
+	    
+	}
+	
+	public void setImgFile(String fileName) {
+		pngFile = new File(fileName);
+	}
+	
+	public void paint(Graphics g){
+
+		BufferedImage readImage = null;
+		try {
+		      readImage = ImageIO.read(pngFile);
+		    } catch (Exception e) {
+		      e.printStackTrace();
+		      readImage = null;
+		    }
+
+		    if (readImage != null){
+		      g.drawImage(readImage, 0, 0, this);
+		    }
+	  }
 }
 
