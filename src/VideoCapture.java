@@ -15,7 +15,8 @@ import com.github.sarxos.webcam.WebcamResolution;
 public class VideoCapture implements Runnable {
 	boolean stopped = false;
 	boolean webcamFlag = false;
-	
+	Webcam webcam = Webcam.getDefault();
+
 	public static void main(String args[]) throws IOException{
 		//doJob();
 	}
@@ -53,8 +54,7 @@ public class VideoCapture implements Runnable {
 	public void run() {
 		int ms;
 		long startTime, endTime, diffTime;
-		Webcam webcam = Webcam.getDefault();
-		//webcam.setViewSize(WebcamResolution.VGA.getSize());
+		webcam.setViewSize(WebcamResolution.VGA.getSize());
 		webcam.open();
 		webcamFlag = true;
 		Calendar cal = Calendar.getInstance(TimeZone.getDefault());
@@ -91,7 +91,7 @@ public class VideoCapture implements Runnable {
 	}
 	
 	public boolean isOpen() {
-		return webcamFlag;
+		return webcam.isOpen();
 	}
 	
 	public String getNearFile(int milli) {
@@ -110,7 +110,7 @@ public class VideoCapture implements Runnable {
 			int fileMilli = Integer.parseInt(fileMilliStr);
 			if(diff > Math.abs(fileMilli - milli)) {
 				diff = Math.abs(fileMilli - milli);
-				ans = files[i].getName();
+				ans = "images/"+files[i].getName();
 			}
 		}
 		return ans;

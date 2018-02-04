@@ -156,14 +156,19 @@ public class WakuwakuSampler implements Runnable {
         	if (c2.next()) {
         		play("hh.wav");
         		panel.setImgFile(hhImg);
+        		panel.paintComponent(panel.getGraphics());
         	}
         	if (c3.next()) {
         		play("sd.wav");
         		panel.setImgFile(sdImg);
+        		panel.paintComponent(panel.getGraphics());
+
         	}
         	if (c4.next()) {
         		play("bd.wav");
         		panel.setImgFile(bdImg);
+        		panel.paintComponent(panel.getGraphics());
+
         	}
         	if (c6.next()) {
         		play("sd.wav");
@@ -171,7 +176,7 @@ public class WakuwakuSampler implements Runnable {
         	if (c8.next()) {
         		play("voice.wav");
         	}
-        	Thread.currentThread().sleep(300);
+        	Thread.currentThread().sleep(400);
         }
 	}
 	
@@ -496,6 +501,7 @@ class WakuwakuPanel extends JPanel {
 
 	
 	public void setImgFile(String fileName) {
+
 		this.fileName = fileName;
 	}
 	
