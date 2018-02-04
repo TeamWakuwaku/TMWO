@@ -482,7 +482,7 @@ public class WakuwakuSampler implements Runnable {
 
 class WakuwakuPanel extends JPanel {
 	
-	String fileName;
+	String fileName = null;
 	
 
 	
@@ -493,10 +493,11 @@ class WakuwakuPanel extends JPanel {
 	
 	public void paintComponent(Graphics g) {
 		super.paintComponent(g);
+		if (fileName != null) {
+			Image img = Toolkit.getDefaultToolkit().getImage(fileName);
 
-		Image img = Toolkit.getDefaultToolkit().getImage(fileName);
-
-		g.drawImage(img, 10, 10, this);
+			g.drawImage(img, 10, 10, this);
+		}
     }
 	
 	
