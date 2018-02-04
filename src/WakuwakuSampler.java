@@ -8,6 +8,8 @@ import javax.swing.*;
 import javax.imageio.*;
 import java.awt.Graphics;
 import java.awt.image.BufferedImage;
+import java.awt.Image;
+import java.awt.Toolkit;
 
 public class WakuwakuSampler implements Runnable {
 	AudioFileFormat.Type fileType = AudioFileFormat.Type.WAVE;
@@ -83,9 +85,9 @@ public class WakuwakuSampler implements Runnable {
         
         System.err.println("Press Enter to START Recording...");
         Thread capThread = new Thread(cap);
-        capThread.start();
-        System.err.println("Waiting the Open of Web Camera...");
-        while (! cap.isOpen()) {}
+        //capThread.start();
+        //System.err.println("Waiting the Open of Web Camera...");
+        //while (! cap.isOpen()) {}
         
         in.readLine();
         System.err.println("Record Started!");
@@ -110,13 +112,63 @@ public class WakuwakuSampler implements Runnable {
         extractHighHat();
         extractVoice();
         
-        WakuwakuFrame frame = new WakuwakuFrame("");
-        frame.setImgFile(cap.getNearFile(iToMilli(bdI)));
         
         
-		Sequencer sequencer = MidiSystem.getSequencer(false);
-		sequencer.open();
+        System.out.println(iToMilli(bdI));
+        WakuwakuPanel panel = new WakuwakuPanel();
+        JFrame frame = new JFrame("");
+	    frame.setBounds(100, 100, 700, 700);
+	    frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+	    frame.add(panel);
+	    frame.setVisible(true);
+        panel.setImgFile(cap.getNearFile(iToMilli(bdI)));
         
+        
+		//Sequencer sequencer = MidiSystem.getSequencer(false);
+		//sequencer.open();
+        
+        WavPlayer wavp = new WavPlayer();
+        Clip bdClip = wavp.loadWav("bd.wav");
+        Clip hhClip = wavp.loadWav("hh.wav");
+        Clip sdClip = wavp.loadWav("sd.wav");
+        Clip voiceClip = wavp.loadWav("voice.wav");
+        
+        Cycle c2 = new Cycle(2);
+        c2.setFlag(1, true);
+        
+        Cycle c3 = new Cycle(3);
+        c3.setFlag(1, true);
+        
+        Cycle c4 = new Cycle(4);
+        c4.setFlag(0, true);
+        
+        Cycle c6 = new Cycle(6);
+        c4.setFlag(1, true);
+        c4.setFlag(2, true);
+        c4.setFlag(5, true);
+        
+        Cycle c8 = new Cycle(8);
+        c8.setFlag(0, true);
+        
+        for (int i = 0; i < 512; i++) {
+        	
+        	if (c2.next()) {
+        		hhClip.start();
+        	}
+        	if (c3.next()) {
+        		sdClip.start();
+        	}
+        	if (c4.next()) {
+        		bdClip.start();
+        	}
+        	if (c6.next()) {
+        		sdClip.start();
+        	}
+        	if (c8.next()) {
+        		voiceClip.start();
+        	}
+        	Thread.currentThread().sleep(300);
+        }
 	}
 	
 	int voiceLen() {
@@ -428,37 +480,51 @@ public class WakuwakuSampler implements Runnable {
 }
 
 
-class WakuwakuFrame extends JFrame {
+class WakuwakuPanel extends JPanel {
 	
-	File pngFile;
+	String fileName;
 	
-	WakuwakuFrame(String title){
-	    setTitle(title);
-	    setBounds(100, 100, 700, 700);
-	    setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-	    setVisible(true);
-	    
-	    
-	    
-	}
+
 	
 	public void setImgFile(String fileName) {
-		pngFile = new File(fileName);
+		this.fileName = fileName;
 	}
 	
-	public void paint(Graphics g){
+	
+	public void paintComponent(Graphics g) {
+		super.paintComponent(g);
 
-		BufferedImage readImage = null;
-		try {
-		      readImage = ImageIO.read(pngFile);
-		    } catch (Exception e) {
-		      e.printStackTrace();
-		      readImage = null;
-		    }
+		Image img = Toolkit.getDefaultToolkit().getImage(fileName);
 
-		    if (readImage != null){
-		      g.drawImage(readImage, 0, 0, this);
-		    }
-	  }
+		g.drawImage(img, 10, 10, this);
+    }
+	
+	
+}
+
+class Cycle {
+	int base;
+	int i;
+	HashMap<Integer, Boolean> flags;
+	
+	Cycle(int base) {
+		this.base = base;
+		i = 0;
+		flags = new HashMap<Integer,Boolean>();
+		for (int k = 0; k < base; k++) {
+			flags.put(k, false);
+		}
+	}
+	
+	void setFlag(int k, boolean flag) {
+		flags.put(k, flag);
+	}
+	
+	boolean next() {
+		boolean ret = flags.get(i);
+		i++;
+		if (i >= base) { i = 0; }
+		return ret;
+	}
 }
 
