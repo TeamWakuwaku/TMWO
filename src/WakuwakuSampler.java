@@ -38,7 +38,7 @@ public class WakuwakuSampler implements Runnable {
 	Track rhythmTrack;
 	
 	VideoCapture cap;
-	
+	WavPlayer wavp;
 	
 	int bdI = -1;
 	int sdI = -1;
@@ -85,9 +85,9 @@ public class WakuwakuSampler implements Runnable {
         
         System.err.println("Press Enter to START Recording...");
         Thread capThread = new Thread(cap);
-        //capThread.start();
-        //System.err.println("Waiting the Open of Web Camera...");
-        //while (! cap.isOpen()) {}
+        capThread.start();
+        System.err.println("Waiting the Open of Web Camera...");
+        while (! cap.isOpen()) {}
         
         in.readLine();
         System.err.println("Record Started!");
@@ -121,13 +121,14 @@ public class WakuwakuSampler implements Runnable {
 	    frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 	    frame.add(panel);
 	    frame.setVisible(true);
-        panel.setImgFile(cap.getNearFile(iToMilli(bdI)));
-        
+        String bdImg = cap.getNearFile(iToMilli(bdI));
+        String sdImg = cap.getNearFile(iToMilli(sdI));
+        String hhImg = cap.getNearFile(iToMilli(hhI));
         
 		//Sequencer sequencer = MidiSystem.getSequencer(false);
 		//sequencer.open();
         
-        WavPlayer wavp = new WavPlayer();
+        wavp = new WavPlayer();
         Clip bdClip = wavp.loadWav("bd.wav");
         Clip hhClip = wavp.loadWav("hh.wav");
         Clip sdClip = wavp.loadWav("sd.wav");
@@ -153,22 +154,30 @@ public class WakuwakuSampler implements Runnable {
         for (int i = 0; i < 512; i++) {
         	
         	if (c2.next()) {
-        		hhClip.start();
+        		play("hh.wav");
+        		panel.setImgFile(hhImg);
         	}
         	if (c3.next()) {
-        		sdClip.start();
+        		play("sd.wav");
+        		panel.setImgFile(sdImg);
         	}
         	if (c4.next()) {
-        		bdClip.start();
+        		play("bd.wav");
+        		panel.setImgFile(bdImg);
         	}
         	if (c6.next()) {
-        		sdClip.start();
+        		play("sd.wav");
         	}
         	if (c8.next()) {
-        		voiceClip.start();
+        		play("voice.wav");
         	}
         	Thread.currentThread().sleep(300);
         }
+	}
+	
+	void play(String wav) {
+		Clip clip = wavp.loadWav(wav);
+		clip.start();
 	}
 	
 	int voiceLen() {

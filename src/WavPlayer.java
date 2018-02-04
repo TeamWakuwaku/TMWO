@@ -8,6 +8,9 @@ import javax.swing.JFrame;
 import java.io.*;
 
 public class WavPlayer {
+	
+	AudioInputStream ais;
+	
 	public Clip loadWav(String fname) {
 		Clip clip = null;	//try‚ªƒGƒ‰[‚ÅI—¹‚µ‚½‚Æ‚«‚Ì€”õ
 		try {
