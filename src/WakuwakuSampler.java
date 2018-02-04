@@ -83,12 +83,10 @@ public class WakuwakuSampler implements Runnable {
         
         System.err.println("Press Enter to START Recording...");
         Thread capThread = new Thread(cap);
-        /*
-
         capThread.start();
         System.err.println("Waiting the Open of Web Camera...");
         while (! cap.isOpen()) {}
-        */
+        
         in.readLine();
         System.err.println("Record Started!");
         Thread thread = new Thread(this);
