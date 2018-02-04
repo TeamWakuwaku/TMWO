@@ -15,10 +15,10 @@ public class WakuwakuSampler implements Runnable {
 	static final boolean SIGNED = true;
 	static final boolean BIG_ENDIAN = true;
 	
-	static int BPM = 120;
+	static int BPM = 100;
 	
 	static int lowTh = 200;
-	static int HighTh = 1500;
+	static int HighTh = 2000;
 	static int WindowSize = 4096;
 	
 	TargetDataLine line;
@@ -29,9 +29,14 @@ public class WakuwakuSampler implements Runnable {
 	
 	VideoCapture cap;
 	
-	List<Double> amps, lowAmps, highAmps;
+	int bdI = -1;
+	int sdI = -1;
+	int hhI = -1;
+	int voiceStart, voiceEnd;
+	
+	List<Double> amps, lowAmps, middleAmps, highAmps;
 
-	double[] valuesActual, valuesImaginal;
+	double[] valuesActual;
 
 	public static void main(String[] args) throws Exception {
 		new WakuwakuSampler();
@@ -45,18 +50,22 @@ public class WakuwakuSampler implements Runnable {
         
         BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
         
-        System.out.println("Press Enter to START Recording...");
+        System.err.println("Press Enter to START Recording...");
+        //Thread capThread = new Thread(cap);
+        //capThread.start();
+        //System.err.println("Waiting the Open of Web Camera...");
+        //while (! cap.isOpen()) {}
         in.readLine();
+        System.err.println("Record Started!");
         Thread thread = new Thread(this);
         thread.start();
-        Thread capThread = new Thread(cap);
-        capThread.start();
+
         
          
-        System.out.println("Press Enter to STOP Recording...");
+        System.err.println("Press Enter to STOP Recording...");
         in.readLine();
         stopRecording();
-        cap.pause();
+        //cap.pause();
         
         initialize();
         dft(WindowSize);
@@ -64,17 +73,122 @@ public class WakuwakuSampler implements Runnable {
 		//int max = (int)Math.pow(2, SAMPLE_SIZE_IN_BITS) * WindowSize;
 		//System.out.println("ratio: "+ (maxAmp / max));
 		
-        //byte[] bassDrumBuf = extractBassDrum();
-        //byte[] snareDrumBuf = extractSnareDrum();
-        //byte[] voiceBuf = extractVoice();
+        extractBassDrum();
+        extractSnareDrum();
+        extractHighHat();
+        extractVoice();
         
 	}
 	
-	/*
-	byte[] extractBassDrum() {
-		for (int i = 0; i < )
+	int voiceLen() {
+		int beats = 4;
+		return (int)Math.round((beats*60/BPM) * format.getSampleRate());
 	}
-	*/
+	
+	void extractVoice() {
+		int len = (int)Math.floor(voiceLen() / WindowSize);
+		voiceStart = 0;
+		voiceEnd = len;
+		double max = 0;
+		for (int i = 0; i < amps.size() - len - 1; i++) {
+			double sum = 0;
+			for (int j = i; j <= i + len; j++) {
+				sum += amps.get(j);
+			}
+			if (sum > max && ! containsDrums(i, i+len)) {
+				max = sum;
+				voiceStart = i;
+				voiceEnd = i + len;
+
+			}
+		}
+		byte[] bytes = extractSound(voiceStart, voiceEnd);
+		saveSound(bytes, "voice.wav");
+	}
+	
+	boolean containsDrums(int i, int j) {
+		if (i <= bdI && bdI <= j) { return true; }
+		if (i <= sdI && sdI <= j) { return true; }
+		if (i <= hhI && hhI <= j) { return true; }
+		return false;
+	}
+	
+	int startFrame(int i) {
+		return i * WindowSize;
+	}
+
+	int endFrame(int i) {
+		return (i+1)*WindowSize - 1;
+	}
+	
+	void valueToByte(byte[] buffer, int i, double v) {
+		if (format.getSampleSizeInBits() == 8) {
+			buffer[i] = (byte)v;
+		} else if (format.getSampleSizeInBits() == 16) {
+			short sample = (short)v;
+			if (format.isBigEndian()) {
+				buffer[i] = (byte) (sample>>>8);
+				buffer[i+1] = (byte) (sample & 0xff);
+			} else {
+				// FIXME
+			}
+		}
+	}
+	
+	byte[] extractSound(int i, int j) {
+		int sampSizeInBytes = (int)(format.getSampleSizeInBits() / 8);
+		int start = startFrame(i);
+		int end = endFrame(j);
+		double[] buffer = Arrays.copyOfRange(valuesActual, start, end+1);//new double[end - start + 1];
+		normalize(buffer);
+		byte[] bytes = new byte[buffer.length * sampSizeInBytes];
+		for (int k = 0; k < buffer.length; k++) {
+			int v = (int)buffer[k];
+			//System.err.println(v);
+			valueToByte(bytes, k * sampSizeInBytes, v);
+		}
+		return bytes;
+	}
+	
+	
+	void extractBassDrum() {
+		double max = 0;
+		for (int i = 0; i < lowAmps.size(); i++) {
+			if (max < lowAmps.get(i)) {
+				max = lowAmps.get(i);
+				bdI = i;
+			}
+		}
+		byte[] bytes = extractSound(bdI, bdI);
+		saveSound(bytes, "bd.wav");
+		
+	}
+	
+	void extractSnareDrum() {
+		double max = 0;
+		for (int i = 0; i < middleAmps.size(); i++) {
+			if (max < middleAmps.get(i)) {
+				max = middleAmps.get(i);
+				sdI = i;
+			}
+		}
+		byte[] bytes = extractSound(sdI, sdI);
+		saveSound(bytes, "sd.wav");
+	}
+
+	
+	void extractHighHat() {
+		double max = 0;
+		for (int i = 0; i < highAmps.size(); i++) {
+			if (max < highAmps.get(i)) {
+				max = highAmps.get(i);
+				hhI = i;
+			}
+		}
+		byte[] bytes = extractSound(hhI, hhI);
+		saveSound(bytes, "hh.wav");
+	}
+
 	
 	public void startRecording() {
 		try {
@@ -88,19 +202,20 @@ public class WakuwakuSampler implements Runnable {
 		}
     }
 	
-	public void stopRecording() {
-	    line.stop();
-		line.close();
-	} 
-	
-	public void run() {
-		fileName = "waku" + System.currentTimeMillis() + ".wav";
+    public void stopRecording() {
+    	line.stop();
+    	line.close();
+    } 
+    
+    public void run() {
+    	fileName = "waku" + System.currentTimeMillis() + ".wav";
         startRecording();
-	}
+    }
 	
 	void dft(int windowSize) {
 		amps = new ArrayList<Double>();
 		lowAmps = new ArrayList<Double>();
+		middleAmps = new ArrayList<Double>();
 		highAmps = new ArrayList<Double>();
 		for (int i = 0; i < valuesActual.length; i += windowSize) {
 			double t = iToTime(i);
@@ -115,6 +230,7 @@ public class WakuwakuSampler implements Runnable {
 				double binHz = (double)format.getSampleRate() / windowSize;
 				double amp = 0;
 				double lowAmp = 0;
+				double middleAmp = 0;
 				double highAmp = 0;
 				for (int j = 0; j < windowSize/2; j++) {
 					double freq = (j+1) * binHz;
@@ -124,12 +240,16 @@ public class WakuwakuSampler implements Runnable {
 					if (freq < lowTh) {
 						lowAmp += norm;
 					}
+					if (lowTh < freq && freq < HighTh ) {
+						middleAmp += norm;
+					}
 					if (freq > HighTh) {
 						highAmp += norm;
 					}
 				}
 				amps.add(amp);
 				lowAmps.add(lowAmp);
+				middleAmps.add(middleAmp);
 				highAmps.add(highAmp);
 				if (amp > maxAmp) { maxAmp = amp; }
 				
@@ -145,90 +265,62 @@ public class WakuwakuSampler implements Runnable {
 	    Track[] tracks = MidiSystem.getSequence(new File(midiFileName)).getTracks();
 	}
 	
-	/**
-     * ���U�t�[���G�ϊ� http://krr.blog.shinobi.jp/javafx_praxis/java%E3%81%A7%E5%91%A8%E6%B3%A2%E6%95%B0%E5%88%86%E6%9E%90%E3%82%92%E3%81%97%E3%81%A6%E3%81%BF%E3%82%8B
-     * @param in �t�[���G�ϊ����s�������z��
-     * @param outActual �v�Z���ʂ̎������z��
-     * @param outImaginal �v�Z���ʂ̋������z��
-     * @param winFlg ���֐��̎g�p�t���O
-     */
     void dft( double[] in , double[] outActual , double[] outImaginal , boolean winFlg )
     {
-        // �z�񏉊���
         int  length             = in.length;
          
-        // ���U�t�[���G�ϊ�
         for( int k=0 ; k<length ; k++ )
         {
-            // ������
             outActual[k]    = 0.0d;
             outImaginal[k]  = 0.0d;
              
-            // �v�Z
             for( int n=0 ; n<length ; n++ )
             {
-                // ���͒l�ɑ��֐���K�p
                 double normal   = ( !winFlg )? in[n]  : hanWindow( in[n] , n , 0 , length );
                  
-                // k�������g�������v�Z
                 outActual[k]    +=        normal * Math.cos( 2.0 * Math.PI * (double)n * (double)k / (double)length );
                 outImaginal[k]  += -1.0 * normal * Math.sin( 2.0 * Math.PI * (double)n * (double)k / (double)length );
             }
              
-            // �c��̌v�Z
             //outActual[k]    /= length;
             //outImaginal[k]  /= length;
         }
     }
     
-    /**
-     * ���֐��i�n�����j
-     * @param in �ϊ�����l
-     * @param i �z�񒆂̃C���f�b�N�X
-     * @param minIndex �z��̍ŏ��C���f�b�N�X
-     * @param maxIndex �z��̍ő�C���f�b�N�X
-     * @return
-     */
     protected double hanWindow( double in , double i , double minIndex , double maxIndex )
     {
-        // ���͒l�̐��K��
         double normal   = i / ( maxIndex - minIndex );
-        // �n�����֐��̒l���擾
         double  han     =  0.5 - 0.5 * Math.cos( 2.0 * Math.PI * normal );
         return in * han;
     }
     
    
     /**
-     * �����t�@�C����ǂݍ��݁A���^���ƃT���v�����O�E�f�[�^���擾
+     *
      * @throws Exception
      */
     protected void initialize() throws Exception
     {
-        // �����X�g���[�����擾
         File                file    = new File( fileName );
         AudioInputStream    is      = AudioSystem.getAudioInputStream( file );
          
-        // ���^���̎擾
         System.out.println( format.toString() );
          
-        // �W�{��
         int mount = (int)is.getFrameLength();
-        
-        // �����f�[�^�̎擾
+        if (mount < 0) {
+        	System.err.println("Sorry, recording failed...");
+        	System.exit(-1);
+        }
         valuesActual    = new double[ mount ];
-        valuesImaginal  = new double[ mount ];
+        //valuesImaginal  = new double[ mount ];
         double max = 0;
         for ( int i=0 ; i<mount ; i++ ) {
-            // 1�W�{���̒l���擾
             int     size        = format.getFrameSize();
             byte[]  data        = new byte[ size ];
             int     readedSize  = is.read(data);
              
-            // �f�[�^�I���Ń��[�v�𔲂���
             if( readedSize == -1 ){ break; } 
              
-            // 1�W�{���̒l���擾
             switch( format.getSampleSizeInBits() )
             {
                 case 8:
@@ -251,14 +343,40 @@ public class WakuwakuSampler implements Runnable {
             }
         }
          
-        // �����X�g���[�������
         is.close();
         
-        normalizeRatio = Math.pow(2, format.getSampleSizeInBits()-1) * 0.9 / max;
-        //System.err.println("normalizeRatio: "+normalizeRatio);
-        for ( int i=0 ; i<mount ; i++ ) {
-        	valuesActual[i] *= normalizeRatio;
-        }
+        normalize(valuesActual, max);
+        
     }
+    
+    void normalize(double[] buf) {
+    	double max = 0;
+    	for (double v : buf) {
+    		if (v > max) { max = v; }
+    	}
+    	normalize(buf, max);
+    }
+    
+    void normalize(double[] buf, double max) {
+    	double targetMax = Math.pow(2, format.getSampleSizeInBits()-1) * 0.9;
+    	double normalizeRatio = targetMax / max;
+    	//System.err.println("normalizeRatio: "+normalizeRatio);
+    	for ( int i=0 ; i < buf.length ; i++ ) {
+        	buf[i] *= normalizeRatio;
+        }
+    	
+    }
+    
+    void saveSound(byte[] bytes, String fileName) {
+    	AudioInputStream ais = new AudioInputStream(
+                new ByteArrayInputStream(bytes), format, bytes.length);
+    	try {
+    		AudioSystem.write(ais, AudioFileFormat.Type.WAVE, new File(fileName));
+    	} catch (Exception e) {
+    		e.printStackTrace();
+    	}
+    	
+    }
+    
 }
 
